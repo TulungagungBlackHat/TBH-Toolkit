@@ -1,0 +1,19 @@
+name: Daily Activity
+on:
+  schedule:
+    - cron: '30 0 * * *'
+  workflow_dispatch:
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          echo "$(date) - TBH update" >> activity.log
+          git config user.name "TulungagungBlackHat"
+          git config user.email "tulungagungblackhat@users.noreply.github.com"
+          git add activity.log
+          git commit -m "chore: daily activity $(date -u +%Y-%m-%d)" || exit 0
+          git push
