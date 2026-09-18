@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import socket
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import urlparse
 
 import requests
@@ -62,7 +62,7 @@ def passive_subdomains(domain: str) -> list[dict]:
 
 def scan_recon(target: str, timeout: float = 8.0, user_agent: str = "TBH-Toolkit/1.0",
                active: bool = False, include_subs: bool = False) -> ScanResult:
-    started = datetime.now(timezone.utc).isoformat()
+    started = datetime.now(UTC).isoformat()
     t0 = time.time()
     base = target if target.startswith(("http://", "https://")) else "http://" + target
     domain = urlparse(base).hostname or target

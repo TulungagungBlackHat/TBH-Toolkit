@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 try:
@@ -28,7 +28,7 @@ class ToolkitConfig:
         return Path(os.environ.get("TOOLKIT_CONFIG", str(Path.home() / ".config" / "toolkit" / "config.toml")))
 
     @classmethod
-    def load(cls, path: str | Path | None = None) -> "ToolkitConfig":
+    def load(cls, path: str | Path | None = None) -> ToolkitConfig:
         cfg = cls()
         p = Path(path) if path else cls.default_path()
         if p.is_file() and tomllib is not None:

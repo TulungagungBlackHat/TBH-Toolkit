@@ -4,8 +4,10 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
+import requests
 
 from toolkit import __version__
 from toolkit.core.config import DEFAULT_TOML, ToolkitConfig
@@ -43,9 +45,9 @@ def _ctx(args) -> ToolkitConfig:
 
 
 def _emit(obj: dict, as_json: bool, quiet: bool = False) -> None:
-    if as_json or quiet and False:
-        print(json.dumps(obj, indent=2))
-    elif as_json:
+    if quiet:
+        return
+    if as_json:
         print(json.dumps(obj, indent=2))
 
 
@@ -118,7 +120,7 @@ def _guarded_host(target: str, args) -> str:
 def cmd_web(args) -> int:
     from toolkit.scanners.web import scan_web
     cfg = _ctx(args)
-    host = _guarded_host(args.target, args)
+    _guarded_host(args.target, args)
     r = scan_web(args.target, timeout=cfg.timeout, user_agent=cfg.user_agent)
     results = [r]
     _maybe_write_report(results, args)
@@ -128,8 +130,8 @@ def cmd_web(args) -> int:
 
 def cmd_headers(args) -> int:
     from toolkit.core.http import build_session
-    from toolkit.scanners.web import check_security_headers
     from toolkit.core.models import Finding
+    from toolkit.scanners.web import check_security_headers
     cfg = _ctx(args)
     _guarded_host(args.target, args)
     base = args.target if args.target.startswith("http") else "http://" + args.target
@@ -138,10 +140,10 @@ def cmd_headers(args) -> int:
         resp = s.get(base, timeout=cfg.timeout)
         findings = check_security_headers(resp, resp.url)
         r = ScanResult(target=resp.url, module="web.headers",
-                       started_at=datetime.now(timezone.utc).isoformat(), findings=findings)
-    except Exception as e:
+                       started_at=datetime.now(UTC).isoformat(), findings=findings)
+    except requests.RequestException as e:
         r = ScanResult(target=args.target, module="web.headers",
-                       started_at=datetime.now(timezone.utc).isoformat(),
+                       started_at=datetime.now(UTC).isoformat(),
                        findings=[Finding(id="http-error", title="fetch failed", severity="MEDIUM",
                                          endpoint=base, evidence=str(e)[:200], explanation="unreachable",
                                          remediation="check target", module="web.headers")])
@@ -179,7 +181,7 @@ def cmd_ssl(args) -> int:
     _ctx(args)
     host = _guarded_host(args.target, args)
     findings = check_tls(host)
-    r = ScanResult(target=host, module="web.tls", started_at=datetime.now(timezone.utc).isoformat(), findings=findings)
+    r = ScanResult(target=host, module="web.tls", started_at=datetime.now(UTC).isoformat(), findings=findings)
     _maybe_write_report([r], args)
     _print_findings([r], args.json, args.quiet)
     return _exit_for([r], args)
@@ -198,8 +200,8 @@ def cmd_recon(args) -> int:
 
 def cmd_scan(args) -> int:
     from toolkit.recon.recon import scan_recon
-    from toolkit.scanners.web import scan_web
     from toolkit.scanners.vuln import scan_vuln
+    from toolkit.scanners.web import scan_web
     cfg = _ctx(args)
     _guarded_host(args.target, args)
     results = [
@@ -277,6 +279,7 @@ def cmd_lab(args) -> int:
               f"password: {pw['verdict']} {pw['advice']}\nlockout demo: {demo[-1]}")
     elif args.mode == "serve":
         from http.server import BaseHTTPRequestHandler, HTTPServer
+
         from toolkit.lab.auth import demo_app_html
         html = demo_app_html()
 

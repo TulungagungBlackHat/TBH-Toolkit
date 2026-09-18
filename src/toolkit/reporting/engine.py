@@ -6,7 +6,6 @@ import html
 import io
 import json
 from pathlib import Path
-from typing import Iterable
 
 from ..core.models import ScanResult
 
@@ -60,9 +59,9 @@ def to_markdown(results: list[ScanResult]) -> str:
 
 def to_html(results: list[ScanResult]) -> str:
     parts = ["<!doctype html><html><head><meta charset=utf-8><title>TBH Toolkit Report</title>",
-             "<style>body{font-family:monospace;background:#0d1117;color:#c9d1d9;padding:24px}"
-             ".crit{color:#ff5555}.high{color:#ff8855}.med{color:#ffcc55}.low{color:#55ccff}"
-             "table{border-collapse:collapse;width:100%}td,th{border:1px solid #333;padding:6px;text-align:left}</style>",
+             ("<style>body{font-family:monospace;background:#0d1117;color:#c9d1d9;padding:24px}"
+              ".crit{color:#ff5555}.high{color:#ff8855}.med{color:#ffcc55}.low{color:#55ccff}"
+              "table{border-collapse:collapse;width:100%}td,th{border:1px solid #333;padding:6px;text-align:left}</style>"),
              "</head><body><h1>TBH Security Toolkit - Scan Report</h1>"]
     for r in results:
         s = summarize(r.findings)

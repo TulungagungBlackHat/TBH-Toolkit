@@ -27,7 +27,7 @@ def _with_param(url: str, payload: str) -> str:
     if not qs:
         sep = "&" if parsed.query else "?"
         return urllib.parse.urlunparse(parsed._replace(query=(parsed.query + sep + f"q={urllib.parse.quote(payload)}" if parsed.query else f"q={urllib.parse.quote(payload)}")))
-    k = list(qs.keys())[0]
+    k = next(iter(qs))
     qs[k] = payload
     return urllib.parse.urlunparse(parsed._replace(query=urllib.parse.urlencode(qs, doseq=True)))
 
@@ -114,7 +114,7 @@ def check_open_redirect(url: str, session: requests.Session, timeout: float) -> 
     if not qs:
         test = url.rstrip("/") + f"?redirect={urllib.parse.quote(payload)}"
     else:
-        k = list(qs.keys())[0]
+        k = next(iter(qs))
         qs[k] = payload
         test = urllib.parse.urlunparse(parsed._replace(query=urllib.parse.urlencode(qs, doseq=True)))
     try:
@@ -232,8 +232,8 @@ VULN_CHECKS = ["xss", "sqli", "lfi", "ssrf", "redirect", "ssti", "idor", "dirs",
 
 def scan_vuln(target: str, checks: list[str] | None = None, timeout: float = 8.0,
               user_agent: str = SAFE_UA, threads: int = 5) -> ScanResult:
-    import datetime as _dt
-    started = _dt.datetime.now(_dt.timezone.utc).isoformat()
+    from datetime import UTC, datetime
+    started = datetime.now(UTC).isoformat()
     t0 = time.time()
     base = target if target.startswith(("http://", "https://")) else "http://" + target
     session = build_session(timeout=timeout, user_agent=user_agent)

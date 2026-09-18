@@ -1,6 +1,6 @@
-from toolkit.scanners.web import scan_web
-from toolkit.scanners.vuln import scan_vuln, check_xss, check_sqli
 from toolkit.core.http import build_session
+from toolkit.scanners.vuln import check_sqli, check_xss, scan_vuln
+from toolkit.scanners.web import scan_web
 
 
 def test_web_scan_lab(lab_server):

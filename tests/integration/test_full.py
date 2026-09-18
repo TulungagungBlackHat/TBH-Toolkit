@@ -1,14 +1,12 @@
 """Integration: cover remaining branches to reach 80%+ meaningful coverage."""
-import json
-import urllib.parse
+from toolkit.cli.main import main
+from toolkit.core import logging_setup as LS
+from toolkit.core.config import ToolkitConfig
+from toolkit.core.http import build_session, request_with_backoff
+from toolkit.core.models import Finding, ScanResult
 from toolkit.scanners import vuln as V
 from toolkit.scanners import web as W
-from toolkit.core.http import build_session, request_with_backoff
-from toolkit.core.config import ToolkitConfig
-from toolkit.core import logging_setup as LS
-from toolkit.core.models import ScanResult, Finding
 from toolkit.utils import encode as E
-from toolkit.cli.main import main
 
 
 def test_with_param_branches():
@@ -61,7 +59,7 @@ def test_web_branches(lab_server):
 
 
 def test_recon_active_and_errors(lab_server):
-    from toolkit.recon.recon import scan_recon, dns_info, http_meta
+    from toolkit.recon.recon import dns_info, http_meta, scan_recon
     assert "error" in dns_info("nonexistent.invalid")
     assert "error" in http_meta("http://127.0.0.1:9/nope", 0.5, "UA")
     r = scan_recon(lab_server, active=True, include_subs=True)
@@ -90,7 +88,7 @@ def test_http_backoff():
     try:
         request_with_backoff(s, "GET", "http://127.0.0.1:9/nope", timeout=0.3, max_attempts=2)
         assert False
-    except Exception:
+    except (requests.ConnectionError, requests.Timeout):
         assert True
 
 
@@ -123,7 +121,6 @@ def test_cli_extras(tmp_path, lab_server):
 
 def test_web_cookie_and_disclosure_branches(lab_server):
     from toolkit.scanners.web import check_cookies, check_disclosure
-    s = build_session()
 
     class FakeResp:
         def __init__(self, headers, text=""):

@@ -12,7 +12,7 @@ import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import urlparse
 
 import requests
@@ -61,9 +61,8 @@ def run_loadtest(target: str, requests_n: int = 100, concurrency: int = 5,
     check_loadtest_limits(requests_n, concurrency, rate)
     base = target if target.startswith(("http://", "https://")) else "http://" + target
     url = base.rstrip("/") + path
-    host = urlparse(base).hostname or target
     stats = LoadStats(target=url, requests=requests_n, concurrency=concurrency,
-                      rate_rps=rate, started_at=datetime.now(timezone.utc).isoformat())
+                      rate_rps=rate, started_at=datetime.now(UTC).isoformat())
     session = build_session(timeout=timeout, user_agent=user_agent)
     gap = 1.0 / max(rate, 0.1)
     lock = threading.Lock()

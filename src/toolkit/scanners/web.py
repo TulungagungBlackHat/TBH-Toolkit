@@ -9,7 +9,7 @@ import re
 import socket
 import ssl
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import urljoin, urlparse
 
 import requests
@@ -31,7 +31,7 @@ SEC_HEADERS = {
     "Permissions-Policy": ("INFO", "Feature permissions policy not set.",
         "Set `Permissions-Policy` to disable unused browser features."),
 }
-SERVER_DISCLOSURE = re.compile(r"(apache/\d|nginx/\d|php/\d|iis/\d|express|gunicorn|werkzeug|django|laravel)", re.I)
+SERVER_DISCLOSURE = re.compile(r"(apache/\d|nginx/\d|php/\d|iis/\d|express|gunicorn|werkzeug|django|laravel)", re.IGNORECASE)
 EMAIL_RE = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
 
 REFS = {
@@ -120,8 +120,8 @@ def check_tls(host: str, port: int = 443, timeout: float = 5.0) -> list[Finding]
             cipher = s.cipher()
             expire = str(cert.get("notAfter", ""))
             try:
-                exp_dt = datetime.strptime(expire, "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
-                days = (exp_dt - datetime.now(timezone.utc)).days
+                exp_dt = datetime.strptime(expire, "%b %d %H:%M:%S %Y %Z").replace(tzinfo=UTC)
+                days = (exp_dt - datetime.now(UTC)).days
             except ValueError:
                 days = 999
             if days < 0:
@@ -139,7 +139,7 @@ def check_tls(host: str, port: int = 443, timeout: float = 5.0) -> list[Finding]
                     severity="INFO", endpoint=f"https://{host}:{port}",
                     evidence=f"notAfter={expire} cipher={cipher[0] if cipher else '?'}",
                     explanation="Certificate chain validated.", remediation="No action.", module="web.tls"))
-    except Exception as e:  # no TLS / connection refused
+    except (OSError, ValueError) as e:  # no TLS / connection refused
         findings.append(Finding(id="tls-unavailable", title="TLS inspection unavailable", severity="INFO",
             endpoint=f"https://{host}:{port}", evidence=str(e)[:200],
             explanation="Host may be HTTP-only or unreachable on 443.", remediation="Enable HTTPS if this is a web service.",
@@ -201,7 +201,7 @@ def check_wellknown(base_url: str, session: requests.Session, timeout: float) ->
 
 def scan_web(target: str, timeout: float = 8.0, user_agent: str = "TBH-Toolkit/1.0",
              check_tls_flag: bool = True) -> ScanResult:
-    started = datetime.now(timezone.utc).isoformat()
+    started = datetime.now(UTC).isoformat()
     t0 = time.time()
     base = _norm_target(target)
     host = urlparse(base).hostname or target

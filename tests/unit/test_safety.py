@@ -1,5 +1,5 @@
 import pytest
-from toolkit.core.safety import SafetyError, is_lab_host, validate_target, check_loadtest_limits
+from toolkit.core.safety import SafetyError, check_loadtest_limits, is_lab_host, validate_target
 
 
 def test_lab_hosts_allowed():

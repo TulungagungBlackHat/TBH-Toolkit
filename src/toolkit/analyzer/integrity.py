@@ -6,15 +6,14 @@ builds a baseline, and reports NEW / MODIFIED / DELETED / SUSPICIOUS.
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 SUSPICIOUS_PATTERNS = [
-    (re.compile(r"<iframe[^>]+src\s*=\s*['\"]http", re.I), "external-iframe"),
-    (re.compile(r"<script[^>]+src\s*=\s*['\"]http", re.I), "external-script"),
+    (re.compile(r"<iframe[^>]+src\s*=\s*['\"]http", re.IGNORECASE), "external-iframe"),
+    (re.compile(r"<script[^>]+src\s*=\s*['\"]http", re.IGNORECASE), "external-script"),
     (re.compile(r"(?i)(eval\s*\(|fromcharcode|unescape\s*\(|document\.write\s*\(|powershell|cmd\.exe|/bin/(ba)?sh)"), "obfuscated-code"),
     (re.compile(r"(?i)deface|hacked by|owned by"), "deface-graffiti"),
 ]
@@ -63,7 +62,7 @@ def build_baseline(root: str | Path) -> dict:
                     size=f.stat().st_size, suspicious=scan_file(f)))
             except OSError:
                 continue
-    return {"root": str(root_p), "created_at": datetime.now(timezone.utc).isoformat(),
+    return {"root": str(root_p), "created_at": datetime.now(UTC).isoformat(),
             "files": [r.to_dict() for r in records]}
 
 
@@ -75,7 +74,7 @@ def check_against_baseline(root: str | Path, baseline: dict) -> dict:
     deleted = sorted(set(old) - set(current))
     modified = sorted(p for p in set(old) & set(current) if old[p]["sha256"] != current[p]["sha256"])
     suspicious = sorted(p for p, rec in current.items() if rec["suspicious"])
-    return {"root": str(root_p), "checked_at": datetime.now(timezone.utc).isoformat(),
+    return {"root": str(root_p), "checked_at": datetime.now(UTC).isoformat(),
             "NEW": new, "MODIFIED": modified, "DELETED": deleted, "SUSPICIOUS": suspicious,
             "counts": {"new": len(new), "modified": len(modified), "deleted": len(deleted),
                        "suspicious": len(suspicious), "total": len(current)},

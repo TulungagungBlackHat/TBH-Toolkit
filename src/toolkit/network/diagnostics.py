@@ -2,10 +2,9 @@
 from __future__ import annotations
 
 import socket
-import ssl
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ..core.models import Finding, ScanResult
 from ..core.safety import check_port_scan_limits
@@ -36,7 +35,7 @@ def tcp_check(host: str, port: int, timeout: float) -> tuple[bool, float, str]:
 
 def scan_ports(host: str, ports: list[int], timeout: float = 1.5,
                threads: int = 10, rate_rps: float = 20.0) -> ScanResult:
-    started = datetime.now(timezone.utc).isoformat()
+    started = datetime.now(UTC).isoformat()
     t0 = time.time()
     check_port_scan_limits(ports, threads, rate_rps)
     ip = socket.gethostbyname(host)
@@ -47,7 +46,7 @@ def scan_ports(host: str, ports: list[int], timeout: float = 1.5,
         time.sleep(gap / max(threads, 1))
         ok, ms, banner = tcp_check(ip, p, timeout)
         return Finding(id=f"port-{p}", title=f"Port {p} {'OPEN' if ok else 'closed'} ({PORT_INFO.get(p, 'unknown')})",
-            severity="INFO" if ok else "INFO", endpoint=f"{ip}:{p}",
+            severity="INFO", endpoint=f"{ip}:{p}",
             evidence=f"open={ok} rtt_ms={ms} banner={banner!r}",
             explanation="TCP connectivity only; no exploitation or credential attempts.",
             remediation="Close unused ports; firewall lab services.", module="network.ports",
@@ -63,7 +62,7 @@ def scan_ports(host: str, ports: list[int], timeout: float = 1.5,
 
 
 def diagnose(host: str, timeout: float = 3.0) -> ScanResult:
-    started = datetime.now(timezone.utc).isoformat()
+    started = datetime.now(UTC).isoformat()
     t0 = time.time()
     findings: list[Finding] = []
     try:
