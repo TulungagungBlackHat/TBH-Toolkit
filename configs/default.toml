@@ -1,0 +1,10 @@
+[toolkit]
+timeout = 8.0
+concurrency = 5
+rate_rps = 2.0
+user_agent = "TBH-Toolkit/1.0 (+authorized-lab-use)"
+output_dir = "reports"
+log_level = "INFO"
+max_requests = 500
+max_concurrency = 10
+allow_external = false
