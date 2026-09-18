@@ -22,7 +22,7 @@ class _JsonFormatter(logging.Formatter):
             "msg": sanitize_for_log(record.getMessage()),
         }
         if hasattr(record, "extra_fields"):
-            payload.update(getattr(record, "extra_fields"))  # type: ignore[union-attr]
+            payload.update(record.extra_fields)  # type: ignore[attr-defined]
         return json.dumps(payload)
 
 

@@ -13,7 +13,6 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from urllib.parse import urlparse
 
 import requests
 

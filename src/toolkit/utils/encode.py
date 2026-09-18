@@ -4,6 +4,8 @@ from __future__ import annotations
 import base64
 import hashlib
 import urllib.parse
+
+
 def b64e(t: str) -> str: return base64.b64encode(t.encode()).decode()
 def b64d(t: str) -> str: return base64.b64decode(t).decode()
 def urle(t: str) -> str: return urllib.parse.quote(t)
