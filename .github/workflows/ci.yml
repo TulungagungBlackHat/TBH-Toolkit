@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - run: pytest --cov=toolkit --cov-fail-under=80 -q
+      - run: ruff check src tests
+      - run: mypy src/toolkit/core src/toolkit/scanners src/toolkit/reporting || true
+      - run: pip install pip-audit && pip-audit || true
+      - name: secret scan (fail on likely secrets)
+        run: |
+          ! grep -rniE "(ghp_|gho_|aws_secret|-----BEGIN (RSA )?PRIVATE KEY|password\s*=\s*['\"][^'\"]{4,})" src tests docs examples configs || (echo "possible secret found" && exit 1)
+          ! grep -rn "AKIA" src tests | grep -v "re.compile" || (echo "possible AWS key found" && exit 1)
+      - run: python -m build || pip install build && python -m build

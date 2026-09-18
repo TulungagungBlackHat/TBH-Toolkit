@@ -1,0 +1,9 @@
+services:
+  lab:
+    image: python:3.11-slim
+    working_dir: /lab
+    volumes:
+      - ./:/lab
+    command: python /lab/lab_server.py 8080
+    ports:
+      - "127.0.0.1:8080:8080"
