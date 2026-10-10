@@ -1,49 +1,57 @@
-# TBH-Toolkit - All-in-One Installer
+# TBH-Toolkit
 
 <p align="center">
-  <img src="https://img.shields.io/badge/TBH-Toolkit-red?style=for-the-badge">
-  <img src="https://img.shields.io/badge/Tools-6-blue?style=for-the-badge">
-  <img src="https://img.shields.io/badge/Install-1%20Click-green?style=for-the-badge">
+  <img src="https://img.shields.io/badge/install-1--line-2ea44f.svg" alt="Install">
+  <img src="https://img.shields.io/badge/tools-20-orange.svg" alt="Tools">
+  <img src="https://img.shields.io/badge/license-MIT-red.svg" alt="License">
+  <img src="https://img.shields.io/badge/platform-Termux%20%7C%20Linux%20%7C%20Kali-000000.svg" alt="Platform">
 </p>
 
-> **Tulungagung Black Hat Toolkit** - Kumpulan semua tools TBH dalam 1 installer.
+One command installs the entire [Tulungagung Black Hat](https://github.com/TulungagungBlackHat) security toolset — 20 standalone Python tools for bug bounty recon, web vulnerability detection, and defensive checks.
 
-## 🛠️ Isi Toolkit
-- [TBH-Recon](https://github.com/TulungagungBlackHat/TBH-Recon) - Web Recon
-- [TBH-PhishDetector](https://github.com/TulungagungBlackHat/TBH-PhishDetector) - Phishing Detector
-- [TBH-PortScanner](https://github.com/TulungagungBlackHat/TBH-PortScanner) - Port Scanner
-- [TBH-PassStrength](https://github.com/TulungagungBlackHat/TBH-PassStrength) - Password Checker
-- [awesome-tulungagung](https://github.com/TulungagungBlackHat/awesome-tulungagung) - Resources
-- [tulungagungblackhat.github.io](https://tulungagungblackhat.github.io) - Portfolio
+## Install
 
-## 🚀 Install 1 Klik
+```bash
+curl -sSL https://raw.githubusercontent.com/TulungagungBlackHat/TBH-Toolkit/main/install.sh | bash
+```
 
-**Termux / Kali / Linux:**
+Or clone first, review, then run:
+
 ```bash
 git clone https://github.com/TulungagungBlackHat/TBH-Toolkit
 cd TBH-Toolkit
 bash install.sh
 ```
 
-**Atau langsung:**
+Requirements: `git`, `python3`, `pip`. Works on Termux, Kali, and any Linux distribution.
+
+## What Gets Installed
+
+| Category | Tools |
+|----------|-------|
+| Recon | TBH-Recon, TBH-SubFinder, TBH-DirFinder, TBH-ParamFinder, TBH-JSLeak |
+| Web detectors | TBH-XSS, TBH-SQLi, TBH-LFI, TBH-SSRF, TBH-SSTI, TBH-OpenRedirect, TBH-IDOR, TBH-CORS |
+| Network / defensive | TBH-PortScanner, TBH-PhishDetector, TBH-PassStrength, TBH-Utils |
+| Workflow | TBH-AllScan, TBH-BugBounty, TBH-CLI |
+
+Each tool is a standalone directory with its own README — clone everything, use what you need, delete the rest.
+
+## After Install
+
 ```bash
-curl -sSL https://raw.githubusercontent.com/TulungagungBlackHat/TBH-Toolkit/main/install.sh | bash
+python3 TBH-Recon/main.py -u https://example.com --help
+python3 TBH-AllScan/allscan.py --help
 ```
 
-## 📦 Manual
-```bash
-git clone https://github.com/TulungagungBlackHat/TBH-Recon
-git clone https://github.com/TulungagungBlackHat/TBH-PhishDetector
-git clone https://github.com/TulungagungBlackHat/TBH-PortScanner
-```
+## What This Script Does (and Doesn't)
 
-## 👥 TBH - Tulungagung Black Hat
-- GitHub: [@TulungagungBlackHat](https://github.com/TulungagungBlackHat)
-- YouTube: [Tulungagung Black Hat](https://www.youtube.com/channel/UCZafyhwr-38rDM5rBlgl4Og)
-- Location: Tulungagung, Jawa Timur - Always Smile :)
+- **Does:** `git clone --depth 1` of the 20 public TBH repositories. Skips repos that already exist. Reports failures without aborting.
+- **Does not:** modify your system, run downloaded code, open ports, or touch anything outside the current directory. Read [install.sh](install.sh) — it's 40 lines.
 
-## ⚠️ Disclaimer
-Hanya untuk edukasi & testing dengan izin. Jangan disalahgunakan.
+## Authorized Use Only
 
-## 📄 License
-MIT
+These tools are for education and for testing systems you own or are explicitly authorized to test. Each repository carries its own [SECURITY.md](https://github.com/TulungagungBlackHat/TBH-Recon/blob/main/SECURITY.md).
+
+## License
+
+[MIT](LICENSE) — Tulungagung Black Hat, East Java, Indonesia. Always Smile :)
