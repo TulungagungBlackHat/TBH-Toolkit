@@ -1,0 +1,231 @@
+#!/usr/bin/env python3
+"""TBH-Toolkit manager - install, update, list, and run the Tulungagung Black Hat toolset."""
+import argparse, json, os, re, subprocess, sys, time
+
+VERSION = "1.0"
+REPO = "https://github.com/TulungagungBlackHat"
+
+TOOLS = [
+    "TBH-Recon", "TBH-SubFinder", "TBH-DirFinder", "TBH-ParamFinder", "TBH-JSLeak",
+    "TBH-XSS", "TBH-SQLi", "TBH-LFI", "TBH-SSRF", "TBH-SSTI",
+    "TBH-OpenRedirect", "TBH-IDOR", "TBH-CORS",
+    "TBH-PortScanner", "TBH-PhishDetector", "TBH-PassStrength", "TBH-Utils",
+    "TBH-AllScan", "TBH-BugBounty", "TBH-CLI",
+]
+
+ENTRY = {
+    "TBH-Recon": "main.py", "TBH-SubFinder": "subfinder.py", "TBH-DirFinder": "dirfinder.py",
+    "TBH-ParamFinder": "paramfinder.py", "TBH-JSLeak": "jsleak.py", "TBH-XSS": "xss.py",
+    "TBH-SQLi": "sqli.py", "TBH-LFI": "lfi.py", "TBH-SSRF": "ssrf.py", "TBH-SSTI": "ssti.py",
+    "TBH-OpenRedirect": "redirect.py", "TBH-IDOR": "idor.py", "TBH-CORS": "cors.py",
+    "TBH-PortScanner": "scanner.py", "TBH-PhishDetector": "detector.py",
+    "TBH-PassStrength": "checker.py", "TBH-Utils": "utils.py", "TBH-AllScan": "allscan.py",
+    "TBH-BugBounty": "bugbounty.py", "TBH-CLI": "tbh",
+}
+
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def green(t): return f"\033[92m{t}\033[0m"
+def red(t): return f"\033[91m{t}\033[0m"
+def cyan(t): return f"\033[96m{t}\033[0m"
+def color_on():
+    return not os.environ.get("NO_COLOR") and sys.stdout.isatty()
+
+def run(cmd, cwd=None, timeout=120):
+    try:
+        r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+        return r.returncode, (r.stdout + r.stderr).strip()
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return 1, str(e)
+
+def installed(tool):
+    return os.path.isdir(os.path.join(BASE, tool))
+
+def git_info(tool):
+    path = os.path.join(BASE, tool)
+    code, out = run(["git", "log", "-1", "--format=%h|%ad|%s", "--date=short"], path)
+    commit, date, subject = (out.split("|", 2) + ["", "", ""])[:3] if code == 0 else ("", "", "")
+    code2, ahead = run(["git", "rev-list", "--count", "@{u}..HEAD"], path)
+    behind = ""
+    code3, out3 = run(["git", "rev-list", "--count", "HEAD..@{u}"], path)
+    if code3 == 0:
+        behind = out3
+    dirty = ""
+    code4, out4 = run(["git", "status", "--porcelain"], path)
+    if code4 == 0:
+        dirty = out4
+    changelog_v3 = ""
+    cl = os.path.join(path, "CHANGELOG.md")
+    if os.path.exists(cl):
+        try:
+            with open(cl) as fh:
+                changelog_v3 = "v3" if "3.0.0" in fh.read() else ""
+        except OSError:
+            pass
+    return {"commit": commit, "date": date, "subject": subject,
+            "ahead": ahead if code2 == 0 else "", "behind": behind, "dirty": bool(dirty),
+            "v3": changelog_v3}
+
+def cmd_list(args):
+    rows = []
+    for tool in TOOLS:
+        if not installed(tool):
+            rows.append({"tool": tool, "state": "missing"})
+            continue
+        info = git_info(tool)
+        info["tool"] = tool
+        info["state"] = "installed"
+        rows.append(info)
+    if args.json:
+        print(json.dumps(rows, indent=2))
+        return 0
+    c = color_on()
+    n_ok = sum(1 for r in rows if r["state"] == "installed")
+    print(cyan(f"TBH toolset @ {BASE} - {n_ok}/{len(TOOLS)} installed"))
+    print(f"{'TOOL':22} {'STATE':9} {'LAST COMMIT':12} {'V3':3} {'UPD':4}")
+    for r in rows:
+        if r["state"] == "missing":
+            line = f"{r['tool']:22} {'missing':9}"
+            print(red(line) if c else line)
+        else:
+            upd = "behind" if r["behind"] not in ("", "0") else "ok"
+            flag = "yes" if r["v3"] else "-"
+            line = (f"{r['tool']:22} {'installed':9} {r['date']:12} {flag:3} {upd:4}  {r['subject'][:40]}")
+            print((red(line) if upd == "behind" else line) if c else line)
+    missing = [r["tool"] for r in rows if r["state"] == "missing"]
+    if missing:
+        print(f"\nInstall missing: {sys.argv[0]} install {' '.join(missing)}")
+    return 0
+
+def cmd_update(args):
+    tools = [t for t in (args.tools or TOOLS) if installed(t)]
+    if not tools:
+        print(red("Nothing installed to update."))
+        return 2
+    ok, behind, fail = 0, 0, 0
+    for i, tool in enumerate(tools):
+        path = os.path.join(BASE, tool)
+        code, _ = run(["git", "fetch", "--quiet"], path, timeout=60)
+        if code != 0:
+            fail += 1
+            continue
+        code, out = run(["git", "rev-list", "--count", "HEAD..@{u}"], path)
+        if code == 0 and out not in ("", "0"):
+            behind += 1
+            if not args.dry_run:
+                c2, _ = run(["git", "pull", "--ff-only", "--quiet"], path, timeout=60)
+                if c2 == 0:
+                    ok += 1
+                else:
+                    fail += 1
+        if not args.no_sleep and i < len(tools) - 1:
+            time.sleep(args.delay)
+    if args.dry_run:
+        print(f"{behind} of {len(tools)} repos have updates (dry run)")
+    else:
+        print(f"Updated {ok}, up-to-date {len(tools) - behind - fail}, failed {fail}")
+    return 1 if fail else 0
+
+def cmd_install(args):
+    tools = args.tools or ["ALL"]
+    if tools == ["ALL"]:
+        tools = TOOLS
+    ok, skip, fail = 0, 0, 0
+    for tool in tools:
+        if tool not in TOOLS:
+            print(red(f"[!] unknown tool {tool} (use list)"))
+            fail += 1
+            continue
+        if installed(tool):
+            print(f"[=] {tool} exists, skipping")
+            skip += 1
+            continue
+        code, _ = run(["git", "clone", "--depth", "1", f"{REPO}/{tool}"], BASE, timeout=180)
+        if code == 0:
+            print(green(f"[+] {tool}"))
+            ok += 1
+        else:
+            print(red(f"[x] {tool} clone failed"))
+            fail += 1
+        if not args.no_sleep:
+            time.sleep(1.5)
+    print(f"Done: {ok} installed, {skip} skipped, {fail} failed")
+    return 1 if fail else 0
+
+def cmd_run(args):
+    tool = args.tool
+    if tool not in ENTRY:
+        print(red(f"[!] unknown tool {tool} (use list)"))
+        return 2
+    if not installed(tool):
+        print(red(f"[!] {tool} not installed: {sys.argv[0]} install {tool}"))
+        return 2
+    entry = os.path.join(BASE, tool, ENTRY[tool])
+    if not os.path.exists(entry):
+        print(red(f"[!] entry point missing: {entry}"))
+        return 2
+    cmd = [sys.executable, entry] + (args.args or [])
+    return subprocess.call(cmd, cwd=os.path.join(BASE, tool))
+
+def cmd_doctor(args):
+    c = color_on()
+    problems = 0
+    def check(label, good, detail=""):
+        nonlocal problems
+        mark = green("[OK]") if good else red("[!!]")
+        if not good:
+            problems += 1
+        print(f"{mark} {label}" + (f" - {detail}" if detail else ""))
+    py = sys.version_info
+    check(f"Python {py.major}.{py.minor}.{py.micro}", py >= (3, 8))
+    try:
+        import requests
+        check(f"requests {requests.__version__}", True)
+    except ImportError:
+        check("requests", False, "pip install requests")
+    code, out = run(["git", "--version"])
+    check("git", code == 0, out)
+    n = sum(1 for t in TOOLS if installed(t))
+    check(f"toolset: {n}/{len(TOOLS)} installed", n == len(TOOLS),
+          f"run {sys.argv[0]} install ALL" if n != len(TOOLS) else "")
+    not_v3 = []
+    for t in TOOLS:
+        if installed(t):
+            info = git_info(t)
+            if not info["v3"]:
+                not_v3.append(t)
+    check("all tools have v3 changelog", not not_v3, ", ".join(not_v3))
+    print(("All good." if problems == 0 else f"{problems} problem(s) found."))
+    return 1 if problems else 0
+
+def main():
+    parser = argparse.ArgumentParser(prog="tbh", description="TBH-Toolkit manager")
+    sub = parser.add_subparsers(dest="cmd")
+    sub.add_parser("list", help="list toolset status")
+    p = sub.add_parser("update", help="git pull all installed tools")
+    p.add_argument("tools", nargs="*", help="subset of repos")
+    p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--delay", type=float, default=0.8, help="pause between repos")
+    p.add_argument("--no-sleep", action="store_true")
+    p = sub.add_parser("install", help="clone missing tools")
+    p.add_argument("tools", nargs="*", help="repo names or ALL (default)")
+    p.add_argument("--no-sleep", action="store_true")
+    p = sub.add_parser("run", help="run a tool")
+    p.add_argument("tool")
+    p.add_argument("args", nargs=argparse.REMAINDER)
+    sub.add_parser("doctor", help="environment health check")
+    for s in sub.choices.values():
+        s.add_argument("--json", action="store_true", help="JSON output (list)")
+    p = sub.add_parser("version", help="print version")
+    args = parser.parse_args()
+
+    dispatch = {"list": cmd_list, "update": cmd_update, "install": cmd_install,
+                "run": cmd_run, "doctor": cmd_doctor,
+                "version": lambda a: print(f"TBH-Toolkit {VERSION}") or 0}
+    if not args.cmd:
+        parser.print_help()
+        return 0
+    return dispatch[args.cmd](args) or 0
+
+if __name__ == "__main__":
+    sys.exit(main())

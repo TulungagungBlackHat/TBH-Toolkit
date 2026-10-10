@@ -43,10 +43,24 @@ python3 TBH-Recon/main.py -u https://example.com --help
 python3 TBH-AllScan/allscan.py --help
 ```
 
+## Manage the toolset
+
+The bundled `tbh` manager keeps every tool current after install:
+
+```bash
+python3 TBH-Toolkit/tbh list          # status: last commit, v3 flag, behind remote
+python3 TBH-Toolkit/tbh update        # paced git pull across all installed tools
+python3 TBH-Toolkit/tbh run TBH-XSS --help   # launch any tool with its real entry point
+python3 TBH-Toolkit/tbh doctor        # python/requests/git + install health
+python3 TBH-Toolkit/tbh install ALL   # clone anything missing
+```
+
+`list --json` gives machine-readable status for scripts. Exit codes: `0` ok, `1` problems found, `2` usage error.
+
 ## What This Script Does (and Doesn't)
 
 - **Does:** `git clone --depth 1` of the 20 public TBH repositories. Skips repos that already exist. Reports failures without aborting.
-- **Does not:** modify your system, run downloaded code, open ports, or touch anything outside the current directory. Read [install.sh](install.sh) — it's 40 lines.
+- **Does not:** modify your system, run downloaded code, open ports, or touch anything outside the current directory. Read [install.sh](install.sh) — it's under 50 lines.
 
 ## Authorized Use Only
 
