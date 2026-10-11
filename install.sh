@@ -15,8 +15,8 @@ REPOS=(
   TBH-Recon TBH-SubFinder TBH-DirFinder TBH-ParamFinder TBH-JSLeak
   TBH-XSS TBH-SQLi TBH-LFI TBH-SSRF TBH-SSTI
   TBH-OpenRedirect TBH-IDOR TBH-CORS
-  TBH-PortScanner TBH-PhishDetector TBH-PassStrength TBH-Utils
-  TBH-AllScan TBH-BugBounty TBH-CLI
+  TBH-PhishDetector TBH-PassStrength TBH-Utils
+  TBH-CLI
 )
 
 ok=0; fail=0
@@ -39,7 +39,7 @@ echo ""
 echo -e "${GREEN}[✓] Done: $ok installed, $fail failed${NC}"
 echo "Start here:"
 echo "  python3 TBH-Recon/main.py -u https://example.com --help"
-echo "  python3 TBH-AllScan/allscan.py --help"
+echo "  python3 TBH-CLI/tbh --help"
 echo ""
 echo "Manage the toolset:  python3 TBH-Toolkit/tbh list / update / doctor"
 echo "Authorized targets only. See SECURITY.md in each repo."

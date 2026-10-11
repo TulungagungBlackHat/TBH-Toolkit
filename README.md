@@ -2,12 +2,12 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/install-1--line-2ea44f.svg" alt="Install">
-  <img src="https://img.shields.io/badge/tools-20-orange.svg" alt="Tools">
+  <img src="https://img.shields.io/badge/tools-17-orange.svg" alt="Tools">
   <img src="https://img.shields.io/badge/license-MIT-red.svg" alt="License">
   <img src="https://img.shields.io/badge/platform-Termux%20%7C%20Linux%20%7C%20Kali-000000.svg" alt="Platform">
 </p>
 
-One command installs the entire [Tulungagung Black Hat](https://github.com/TulungagungBlackHat) security toolset — 20 standalone Python tools for bug bounty recon, web vulnerability detection, and defensive checks.
+One command installs the entire [Tulungagung Black Hat](https://github.com/TulungagungBlackHat) security toolset — 17 standalone Python tools for bug bounty recon, web vulnerability detection, and defensive checks.
 
 ## Install
 
@@ -31,8 +31,8 @@ Requirements: `git`, `python3`, `pip`. Works on Termux, Kali, and any Linux dist
 |----------|-------|
 | Recon | TBH-Recon, TBH-SubFinder, TBH-DirFinder, TBH-ParamFinder, TBH-JSLeak |
 | Web detectors | TBH-XSS, TBH-SQLi, TBH-LFI, TBH-SSRF, TBH-SSTI, TBH-OpenRedirect, TBH-IDOR, TBH-CORS |
-| Network / defensive | TBH-PortScanner, TBH-PhishDetector, TBH-PassStrength, TBH-Utils |
-| Workflow | TBH-AllScan, TBH-BugBounty, TBH-CLI |
+| Network / defensive | TBH-PhishDetector, TBH-PassStrength, TBH-Utils |
+| Workflow | TBH-CLI |
 
 Each tool is a standalone directory with its own README — clone everything, use what you need, delete the rest.
 
@@ -40,7 +40,7 @@ Each tool is a standalone directory with its own README — clone everything, us
 
 ```bash
 python3 TBH-Recon/main.py -u https://example.com --help
-python3 TBH-AllScan/allscan.py --help
+python3 TBH-CLI/tbh --list
 ```
 
 ## Manage the toolset
@@ -59,7 +59,7 @@ python3 TBH-Toolkit/tbh install ALL   # clone anything missing
 
 ## What This Script Does (and Doesn't)
 
-- **Does:** `git clone --depth 1` of the 20 public TBH repositories. Skips repos that already exist. Reports failures without aborting.
+- **Does:** `git clone --depth 1` of the 17 public TBH repositories. Skips repos that already exist. Reports failures without aborting.
 - **Does not:** modify your system, run downloaded code, open ports, or touch anything outside the current directory. Read [install.sh](install.sh) — it's under 50 lines.
 
 ## Authorized Use Only
@@ -69,3 +69,5 @@ These tools are for education and for testing systems you own or are explicitly 
 ## License
 
 [MIT](LICENSE) — Tulungagung Black Hat, East Java, Indonesia. Always Smile :)
+
+> TBH-AllScan, TBH-BugBounty, and TBH-PortScanner are archived — superseded by [TBH-CLI](https://github.com/TulungagungBlackHat/TBH-CLI).

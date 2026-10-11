@@ -9,8 +9,8 @@ TOOLS = [
     "TBH-Recon", "TBH-SubFinder", "TBH-DirFinder", "TBH-ParamFinder", "TBH-JSLeak",
     "TBH-XSS", "TBH-SQLi", "TBH-LFI", "TBH-SSRF", "TBH-SSTI",
     "TBH-OpenRedirect", "TBH-IDOR", "TBH-CORS",
-    "TBH-PortScanner", "TBH-PhishDetector", "TBH-PassStrength", "TBH-Utils",
-    "TBH-AllScan", "TBH-BugBounty", "TBH-CLI",
+    "TBH-PhishDetector", "TBH-PassStrength", "TBH-Utils",
+    "TBH-CLI",
 ]
 
 ENTRY = {
@@ -18,9 +18,9 @@ ENTRY = {
     "TBH-ParamFinder": "paramfinder.py", "TBH-JSLeak": "jsleak.py", "TBH-XSS": "xss.py",
     "TBH-SQLi": "sqli.py", "TBH-LFI": "lfi.py", "TBH-SSRF": "ssrf.py", "TBH-SSTI": "ssti.py",
     "TBH-OpenRedirect": "redirect.py", "TBH-IDOR": "idor.py", "TBH-CORS": "cors.py",
-    "TBH-PortScanner": "scanner.py", "TBH-PhishDetector": "detector.py",
-    "TBH-PassStrength": "checker.py", "TBH-Utils": "utils.py", "TBH-AllScan": "allscan.py",
-    "TBH-BugBounty": "bugbounty.py", "TBH-CLI": "tbh",
+    "TBH-PhishDetector": "detector.py",
+    "TBH-PassStrength": "checker.py", "TBH-Utils": "utils.py",
+    "TBH-CLI": "tbh",
 }
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
