@@ -1,180 +1,88 @@
 #!/usr/bin/env python3
-"""TBH-Toolkit manager - install, update, list, and run the Tulungagung Black Hat toolset."""
-import argparse, json, os, re, subprocess, sys, time
+"""TBH v4 - Tulungagung Black Hat unified security toolkit (authorized testing only).
 
-VERSION = "1.0"
-REPO = "https://github.com/TulungagungBlackHat"
+One command, all tools:  tbh <tool> [flags]
+"""
+import importlib, os, re, subprocess, sys
 
-TOOLS = [
-    "TBH-Recon", "TBH-SubFinder", "TBH-DirFinder", "TBH-ParamFinder", "TBH-JSLeak",
-    "TBH-XSS", "TBH-SQLi", "TBH-LFI", "TBH-SSRF", "TBH-SSTI",
-    "TBH-OpenRedirect", "TBH-IDOR", "TBH-CORS",
-    "TBH-PhishDetector", "TBH-PassStrength", "TBH-Utils",
-    "TBH-CLI",
+VERSION = "4.0"
+REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
+
+REGISTRY = [
+    ("recon", "modules.recon", "Web recon: headers, SSL, ports, subdomains"),
+    ("subfinder", "modules.subfinder", "Subdomain enum + CNAME takeover detection"),
+    ("dirfinder", "modules.dirfinder", "Directory discovery with recursion (--depth)"),
+    ("paramfinder", "modules.paramfinder", "Hidden parameter discovery (active + passive)"),
+    ("jsleak", "modules.jsleak", "Secrets hunting in JavaScript files"),
+    ("xss", "modules.xss", "Reflected XSS detector (multi-payload, blind callback)"),
+    ("sqli", "modules.sqli", "Error-based SQL injection detector"),
+    ("lfi", "modules.lfi", "Path traversal / LFI detector"),
+    ("ssrf", "modules.ssrf", "SSRF detector (URL params, OOB collab)"),
+    ("ssti", "modules.ssti", "Template injection detector (dual-math)"),
+    ("redirect", "modules.redirect", "Open redirect detector"),
+    ("idor", "modules.idor", "IDOR probe (ID swap window)"),
+    ("cors", "modules.cors", "CORS misconfiguration detector"),
+    ("portscan", "modules.portscan", "Port scanner: top-100, banners, CVE hints"),
+    ("phish", "modules.phish", "Phishing URL detector (12 heuristics)"),
+    ("passstrength", "modules.passstrength", "Password strength checker + generator"),
+    ("utils", "modules.utils", "Encoder utilities: b64, url, hash, jwt inspect"),
+    ("web", "modules.cli", "34-module web check suite (was TBH-CLI)"),
 ]
+ALIASES = {"cli": "web", "scanner": "portscan", "password": "passstrength"}
+META = ("list", "doctor", "update", "version", "help")
 
-ENTRY = {
-    "TBH-Recon": "main.py", "TBH-SubFinder": "subfinder.py", "TBH-DirFinder": "dirfinder.py",
-    "TBH-ParamFinder": "paramfinder.py", "TBH-JSLeak": "jsleak.py", "TBH-XSS": "xss.py",
-    "TBH-SQLi": "sqli.py", "TBH-LFI": "lfi.py", "TBH-SSRF": "ssrf.py", "TBH-SSTI": "ssti.py",
-    "TBH-OpenRedirect": "redirect.py", "TBH-IDOR": "idor.py", "TBH-CORS": "cors.py",
-    "TBH-PhishDetector": "detector.py",
-    "TBH-PassStrength": "checker.py", "TBH-Utils": "utils.py",
-    "TBH-CLI": "tbh",
-}
+def color(code, text):
+    if os.environ.get("NO_COLOR") or not sys.stdout.isatty():
+        return text
+    return f"\033[{code}m{text}\033[0m"
 
-BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+def cmd_map():
+    return {name: mod for name, mod, _ in REGISTRY}
 
-def green(t): return f"\033[92m{t}\033[0m"
-def red(t): return f"\033[91m{t}\033[0m"
-def cyan(t): return f"\033[96m{t}\033[0m"
-def color_on():
-    return not os.environ.get("NO_COLOR") and sys.stdout.isatty()
-
-def run(cmd, cwd=None, timeout=120):
-    try:
-        r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout)
-        return r.returncode, (r.stdout + r.stderr).strip()
-    except (OSError, subprocess.TimeoutExpired) as e:
-        return 1, str(e)
-
-def installed(tool):
-    return os.path.isdir(os.path.join(BASE, tool))
-
-def git_info(tool):
-    path = os.path.join(BASE, tool)
-    code, out = run(["git", "log", "-1", "--format=%h|%ad|%s", "--date=short"], path)
-    commit, date, subject = (out.split("|", 2) + ["", "", ""])[:3] if code == 0 else ("", "", "")
-    code2, ahead = run(["git", "rev-list", "--count", "@{u}..HEAD"], path)
-    behind = ""
-    code3, out3 = run(["git", "rev-list", "--count", "HEAD..@{u}"], path)
-    if code3 == 0:
-        behind = out3
-    dirty = ""
-    code4, out4 = run(["git", "status", "--porcelain"], path)
-    if code4 == 0:
-        dirty = out4
-    changelog_v3 = ""
-    cl = os.path.join(path, "CHANGELOG.md")
-    if os.path.exists(cl):
+def print_help():
+    print(color("91", "TBH") + f" v{VERSION} - Tulungagung Black Hat unified toolkit")
+    print("Usage: tbh <tool> [flags]\n")
+    print(color("96", "Tools:"))
+    width = max(len(n) for n, _, _ in REGISTRY)
+    for name, mod, desc in REGISTRY:
         try:
-            with open(cl) as fh:
-                changelog_v3 = "v3" if "3.0.0" in fh.read() else ""
+            src = open(os.path.join(REPO_ROOT, mod.replace(".", "/") + ".py")).read()
+            ver = re.search(r'VERSION = "([^"]+)"', src)
+            v = f" v{ver.group(1)}" if ver else ""
         except OSError:
-            pass
-    return {"commit": commit, "date": date, "subject": subject,
-            "ahead": ahead if code2 == 0 else "", "behind": behind, "dirty": bool(dirty),
-            "v3": changelog_v3}
+            v = ""
+        print(f"  {name:<{width}}  {desc}{color('90', v)}")
+    print(color("96", "\nMeta:"))
+    print("  list               same as tools with versions")
+    print("  doctor             check python/requests environment")
+    print("  update             git pull this toolkit")
+    print("  version            print toolkit version")
+    print(color("96", "\nExamples:"))
+    print("  tbh recon -u https://example.com --ssl -p -s")
+    print("  tbh xss -u 'https://example.com/?q=test' --param all")
+    print("  tbh web -u https://example.com --json r.json --html r.html")
+    print("  tbh dirfinder -u https://example.com --depth 2")
+    print("  tbh --help | tbh <tool> --help for per-tool flags")
+    print(color("91", "\n[!] Authorized targets only."))
 
-def cmd_list(args):
-    rows = []
-    for tool in TOOLS:
-        if not installed(tool):
-            rows.append({"tool": tool, "state": "missing"})
-            continue
-        info = git_info(tool)
-        info["tool"] = tool
-        info["state"] = "installed"
-        rows.append(info)
-    if args.json:
-        print(json.dumps(rows, indent=2))
-        return 0
-    c = color_on()
-    n_ok = sum(1 for r in rows if r["state"] == "installed")
-    print(cyan(f"TBH toolset @ {BASE} - {n_ok}/{len(TOOLS)} installed"))
-    print(f"{'TOOL':22} {'STATE':9} {'LAST COMMIT':12} {'V3':3} {'UPD':4}")
-    for r in rows:
-        if r["state"] == "missing":
-            line = f"{r['tool']:22} {'missing':9}"
-            print(red(line) if c else line)
-        else:
-            upd = "behind" if r["behind"] not in ("", "0") else "ok"
-            flag = "yes" if r["v3"] else "-"
-            line = (f"{r['tool']:22} {'installed':9} {r['date']:12} {flag:3} {upd:4}  {r['subject'][:40]}")
-            print((red(line) if upd == "behind" else line) if c else line)
-    missing = [r["tool"] for r in rows if r["state"] == "missing"]
-    if missing:
-        print(f"\nInstall missing: {sys.argv[0]} install {' '.join(missing)}")
+def cmd_list():
+    print(f"{'TOOL':14} {'VERSION':8} DESCRIPTION")
+    for name, mod, desc in REGISTRY:
+        try:
+            src = open(os.path.join(REPO_ROOT, mod.replace(".", "/") + ".py")).read()
+            ver = re.search(r'VERSION = "([^"]+)"', src).group(1)
+        except (OSError, AttributeError):
+            ver = "?"
+        print(f"{name:14} {ver:8} {desc}")
     return 0
 
-def cmd_update(args):
-    tools = [t for t in (args.tools or TOOLS) if installed(t)]
-    if not tools:
-        print(red("Nothing installed to update."))
-        return 2
-    ok, behind, fail = 0, 0, 0
-    for i, tool in enumerate(tools):
-        path = os.path.join(BASE, tool)
-        code, _ = run(["git", "fetch", "--quiet"], path, timeout=60)
-        if code != 0:
-            fail += 1
-            continue
-        code, out = run(["git", "rev-list", "--count", "HEAD..@{u}"], path)
-        if code == 0 and out not in ("", "0"):
-            behind += 1
-            if not args.dry_run:
-                c2, _ = run(["git", "pull", "--ff-only", "--quiet"], path, timeout=60)
-                if c2 == 0:
-                    ok += 1
-                else:
-                    fail += 1
-        if not args.no_sleep and i < len(tools) - 1:
-            time.sleep(args.delay)
-    if args.dry_run:
-        print(f"{behind} of {len(tools)} repos have updates (dry run)")
-    else:
-        print(f"Updated {ok}, up-to-date {len(tools) - behind - fail}, failed {fail}")
-    return 1 if fail else 0
-
-def cmd_install(args):
-    tools = args.tools or ["ALL"]
-    if tools == ["ALL"]:
-        tools = TOOLS
-    ok, skip, fail = 0, 0, 0
-    for tool in tools:
-        if tool not in TOOLS:
-            print(red(f"[!] unknown tool {tool} (use list)"))
-            fail += 1
-            continue
-        if installed(tool):
-            print(f"[=] {tool} exists, skipping")
-            skip += 1
-            continue
-        code, _ = run(["git", "clone", "--depth", "1", f"{REPO}/{tool}"], BASE, timeout=180)
-        if code == 0:
-            print(green(f"[+] {tool}"))
-            ok += 1
-        else:
-            print(red(f"[x] {tool} clone failed"))
-            fail += 1
-        if not args.no_sleep:
-            time.sleep(1.5)
-    print(f"Done: {ok} installed, {skip} skipped, {fail} failed")
-    return 1 if fail else 0
-
-def cmd_run(args):
-    tool = args.tool
-    if tool not in ENTRY:
-        print(red(f"[!] unknown tool {tool} (use list)"))
-        return 2
-    if not installed(tool):
-        print(red(f"[!] {tool} not installed: {sys.argv[0]} install {tool}"))
-        return 2
-    entry = os.path.join(BASE, tool, ENTRY[tool])
-    if not os.path.exists(entry):
-        print(red(f"[!] entry point missing: {entry}"))
-        return 2
-    cmd = [sys.executable, entry] + (args.args or [])
-    return subprocess.call(cmd, cwd=os.path.join(BASE, tool))
-
-def cmd_doctor(args):
-    c = color_on()
-    problems = 0
+def cmd_doctor():
+    ok = True
     def check(label, good, detail=""):
-        nonlocal problems
-        mark = green("[OK]") if good else red("[!!]")
+        nonlocal ok
+        mark = color("92", "[OK]") if good else color("91", "[!!]")
         if not good:
-            problems += 1
+            ok = False
         print(f"{mark} {label}" + (f" - {detail}" if detail else ""))
     py = sys.version_info
     check(f"Python {py.major}.{py.minor}.{py.micro}", py >= (3, 8))
@@ -183,49 +91,134 @@ def cmd_doctor(args):
         check(f"requests {requests.__version__}", True)
     except ImportError:
         check("requests", False, "pip install requests")
-    code, out = run(["git", "--version"])
-    check("git", code == 0, out)
-    n = sum(1 for t in TOOLS if installed(t))
-    check(f"toolset: {n}/{len(TOOLS)} installed", n == len(TOOLS),
-          f"run {sys.argv[0]} install ALL" if n != len(TOOLS) else "")
-    not_v3 = []
-    for t in TOOLS:
-        if installed(t):
-            info = git_info(t)
-            if not info["v3"]:
-                not_v3.append(t)
-    check("all tools have v3 changelog", not not_v3, ", ".join(not_v3))
-    print(("All good." if problems == 0 else f"{problems} problem(s) found."))
-    return 1 if problems else 0
+    n_mod = len([f for f in os.listdir(os.path.join(REPO_ROOT, "modules")) if f.endswith(".py")])
+    check(f"modules: {n_mod - 1} tool files", n_mod - 1 >= len(REGISTRY) - 1)
+    check("git repo", os.path.isdir(os.path.join(REPO_ROOT, ".git")))
+    print("All good." if ok else "Problems found.")
+    return 0 if ok else 1
+
+def cmd_update():
+    if not os.path.isdir(os.path.join(REPO_ROOT, ".git")):
+        print(color("91", "[!] not a git checkout; reinstall via install.sh"), file=sys.stderr)
+        return 2
+    print("[*] git pull --ff-only ...")
+    r = subprocess.call(["git", "pull", "--ff-only"], cwd=REPO_ROOT)
+    if r == 0:
+        print(color("92", "[✓] updated"))
+    return r
+
+def input_line(prompt):
+    try:
+        return input(prompt)
+    except EOFError:
+        return None
+
+def run_tool(name, extra, target=None):
+    cmdline = [sys.executable, os.path.abspath(__file__), name]
+    if target:
+        cmdline += ["-u", target]
+    cmdline += extra
+    print(color("96", f"[*] running: {' '.join(cmdline[2:])}"), flush=True)
+    return subprocess.call(cmdline)
+
+def interactive():
+    """Numbered menu (Termux classic style)."""
+    import shlex
+    tools = REGISTRY
+    while True:
+        print()
+        print(color("91", "╔════════════════════════════════════╗"))
+        print(color("91", "║") + color("0", "   TBH Toolkit v" + VERSION + "  -  Menu     ") + color("91", "║"))
+        print(color("91", "║") + color("90", "   Tulungagung Black Hat             ") + color("91", "║"))
+        print(color("91", "╚════════════════════════════════════╝"))
+        width = max(len(n) for n, _, _ in tools)
+        for i, (name, _, desc) in enumerate(tools, 1):
+            print(f"  {color('96', f'[{i:>2}]')} {name:<{width}}  {desc}")
+        print(f"  {color('96', '[ D]')} doctor    environment check")
+        print(f"  {color('96', '[ U]')} update    git pull this toolkit")
+        print(f"  {color('96', '[ V]')} version   print version")
+        print(f"  {color('96', '[ 0]')} exit")
+        print(color("90", "─" * 40))
+        raw = input_line(color("91", "tbh> "))
+        if raw is None:
+            print()
+            return 0
+        choice = raw.strip().lower()
+        if choice in ("0", "q", "exit", "quit"):
+            print(color("90", "bye. authorized targets only."))
+            return 0
+        if choice in ("d", "doctor"):
+            cmd_doctor()
+            input_line(color("90", "[enter]"))
+            continue
+        if choice in ("u", "update"):
+            cmd_update()
+            input_line(color("90", "[enter]"))
+            continue
+        if choice in ("v", "version", "--version"):
+            print(f"TBH {VERSION}")
+            input_line(color("90", "[enter]"))
+            continue
+        if choice in ("h", "help", "?"):
+            print_help()
+            input_line(color("90", "[enter]"))
+            continue
+        if not choice.isdigit() or not (1 <= int(choice) <= len(tools)):
+            print(color("91", f"[!] invalid choice '{choice}'"))
+            continue
+        name, _, desc = tools[int(choice) - 1]
+        print(color("96", f"[*] {name} - {desc}"))
+        target = None
+        if name not in ("utils", "passstrength"):
+            t = input_line("    target URL (blank = tool's own menu/help): ")
+            if t is None:
+                return 0
+            t = t.strip()
+            if t:
+                target = t
+        extra_raw = input_line("    extra flags (optional, e.g. --param all --json r.json): ")
+        if extra_raw is None:
+            return 0
+        try:
+            extra = shlex.split(extra_raw.strip()) if extra_raw.strip() else []
+        except ValueError as e:
+            print(color("91", f"[!] bad flags: {e}"))
+            continue
+        run_tool(name, extra, target)
+        input_line(color("90", "[enter] to return to menu"))
 
 def main():
-    parser = argparse.ArgumentParser(prog="tbh", description="TBH-Toolkit manager")
-    sub = parser.add_subparsers(dest="cmd")
-    sub.add_parser("list", help="list toolset status")
-    p = sub.add_parser("update", help="git pull all installed tools")
-    p.add_argument("tools", nargs="*", help="subset of repos")
-    p.add_argument("--dry-run", action="store_true")
-    p.add_argument("--delay", type=float, default=0.8, help="pause between repos")
-    p.add_argument("--no-sleep", action="store_true")
-    p = sub.add_parser("install", help="clone missing tools")
-    p.add_argument("tools", nargs="*", help="repo names or ALL (default)")
-    p.add_argument("--no-sleep", action="store_true")
-    p = sub.add_parser("run", help="run a tool")
-    p.add_argument("tool")
-    p.add_argument("args", nargs=argparse.REMAINDER)
-    sub.add_parser("doctor", help="environment health check")
-    for s in sub.choices.values():
-        s.add_argument("--json", action="store_true", help="JSON output (list)")
-    p = sub.add_parser("version", help="print version")
-    args = parser.parse_args()
-
-    dispatch = {"list": cmd_list, "update": cmd_update, "install": cmd_install,
-                "run": cmd_run, "doctor": cmd_doctor,
-                "version": lambda a: print(f"TBH-Toolkit {VERSION}") or 0}
-    if not args.cmd:
-        parser.print_help()
+    if len(sys.argv) == 1:
+        if sys.stdin.isatty() or os.environ.get("TBH_FORCE_MENU"):
+            return interactive()
+        print_help()
         return 0
-    return dispatch[args.cmd](args) or 0
+    arg = sys.argv[1]
+    if arg in ("-h", "--help", "help"):
+        print_help()
+        return 0
+    if arg in ("-V", "--version", "version"):
+        print(f"TBH {VERSION}")
+        return 0
+    if arg == "list":
+        return cmd_list()
+    if arg == "doctor":
+        return cmd_doctor()
+    if arg == "update":
+        return cmd_update()
+    name = ALIASES.get(arg, arg)
+    modules = cmd_map()
+    if name not in modules:
+        print(color("91", f"[!] unknown tool '{arg}' (tbh --help for the list)"), file=sys.stderr)
+        return 2
+    try:
+        mod = importlib.import_module(modules[name])
+    except ImportError as e:
+        print(color("91", f"[!] cannot load {name}: {e}"), file=sys.stderr)
+        print(color("91", "[!] pip install requests"), file=sys.stderr)
+        return 2
+    sys.argv = [f"tbh {name}"] + sys.argv[2:]
+    return mod.main() or 0
 
 if __name__ == "__main__":
     sys.exit(main())

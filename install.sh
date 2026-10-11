@@ -1,45 +1,39 @@
 #!/bin/bash
-# TBH-Toolkit Installer - Tulungagung Black Hat
-# Clones the full TBH security toolset. Safe by design: only runs `git clone`.
+# TBH installer - one repo, one command.
+# Safe by design: git clone + pip install requests only.
 set -u
 
 RED='\033[91m'; GREEN='\033[92m'; CYAN='\033[96m'; NC='\033[0m'
+REPO_URL="https://github.com/TulungagungBlackHat/TBH-Toolkit"
+DEST="${1:-TBH-Toolkit}"
 
 echo -e "${RED}╔════════════════════════════════════╗"
-echo -e "║  TBH-Toolkit Installer             ║"
+echo -e "║  TBH Toolkit Installer (unified)   ║"
 echo -e "║  Tulungagung Black Hat             ║"
 echo -e "╚════════════════════════════════════╝${NC}"
-echo -e "[*] Installing TBH toolset..."
 
-REPOS=(
-  TBH-Recon TBH-SubFinder TBH-DirFinder TBH-ParamFinder TBH-JSLeak
-  TBH-XSS TBH-SQLi TBH-LFI TBH-SSRF TBH-SSTI
-  TBH-OpenRedirect TBH-IDOR TBH-CORS
-  TBH-PhishDetector TBH-PassStrength TBH-Utils
-  TBH-CLI
-)
+if [ -d "$DEST" ]; then
+  echo -e "${CYAN}[=] $DEST exists, skipping clone${NC}"
+else
+  git clone --depth 1 "$REPO_URL" "$DEST" || {
+    echo -e "${RED}[✗] clone failed${NC}"; exit 1; }
+  echo -e "${GREEN}[+] cloned $DEST${NC}"
+fi
 
-ok=0; fail=0
-for repo in "${REPOS[@]}"; do
-  if [ -d "$repo" ]; then
-    echo -e "${CYAN}[=] $repo already exists, skipping${NC}"
-    ok=$((ok+1))
-    continue
-  fi
-  if git clone --depth 1 "https://github.com/TulungagungBlackHat/$repo" >/dev/null 2>&1; then
-    echo -e "${GREEN}[✓] $repo${NC}"
-    ok=$((ok+1))
-  else
-    echo -e "${RED}[✗] $repo (clone failed)${NC}"
-    fail=$((fail+1))
-  fi
-done
+cd "$DEST" || exit 1
+chmod +x tbh
+
+if python3 -c "import requests" 2>/dev/null; then
+  echo -e "${GREEN}[+] requests already installed${NC}"
+else
+  python3 -m pip install --user requests && echo -e "${GREEN}[+] requests installed${NC}" \
+    || echo -e "${RED}[!] pip failed - run: python3 -m pip install requests${NC}"
+fi
 
 echo ""
-echo -e "${GREEN}[✓] Done: $ok installed, $fail failed${NC}"
-echo "Start here:"
-echo "  python3 TBH-Recon/main.py -u https://example.com --help"
-echo "  python3 TBH-CLI/tbh --help"
+echo -e "${GREEN}[✓] Done. Start here:${NC}"
+echo "  python3 $DEST/tbh --help"
+echo "  python3 $DEST/tbh list"
+echo "  python3 $DEST/tbh recon -u https://example.com --ssl -p -s"
 echo ""
-echo "Manage the toolset:  python3 TBH-Toolkit/tbh list / update / doctor"
-echo "Authorized targets only. See SECURITY.md in each repo."
+echo "Authorized targets only. See SECURITY.md."

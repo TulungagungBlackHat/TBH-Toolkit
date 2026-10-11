@@ -11,12 +11,19 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install requests
-      - name: Compile manager
-        run: python3 -m py_compile tbh
-      - name: Manager self-test
+      - name: Compile everything
+        run: python3 -m py_compile tbh modules/*.py
+      - name: Dispatcher smoke
         run: |
           python3 tbh version
-          python3 tbh list --json
-          python3 tbh doctor || true
+          python3 tbh list
+          python3 tbh doctor
+      - name: Every tool --help
+        run: |
+          for c in recon subfinder dirfinder paramfinder jsleak xss sqli lfi ssrf ssti \
+                   redirect idor cors portscan phish passstrength utils web; do
+            echo "== tbh $c =="
+            python3 tbh "$c" --help >/dev/null
+          done
       - name: Lint installer
         run: bash -n install.sh
