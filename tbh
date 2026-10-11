@@ -6,13 +6,64 @@ menu when you run it bare, subcommands when you know what you want.
 
 authorized targets only.
 """
-import importlib, os, re, subprocess, sys
+import importlib, json, os, re, subprocess, sys
 
-VERSION = "4.0"
+VERSION = "4.1"
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
+TBH_HOME = os.path.expanduser("~/.tbh")
+CONFIG_PATH = os.path.join(TBH_HOME, "config.json")
+FINDINGS_PATH = os.path.join(TBH_HOME, "findings.jsonl")
+
+# which tools actually accept which flags (argparse hates surprises)
+FULL = {"--proxy", "--cookie", "--timeout", "-H"}
+SUPPORT = {
+    "proxy": {"recon", "subfinder", "dirfinder", "paramfinder", "jsleak",
+              "xss", "sqli", "lfi", "ssrf", "ssti", "redirect", "idor",
+              "cors", "web"},
+    "cookie": {"recon", "dirfinder", "paramfinder", "jsleak",
+               "xss", "sqli", "lfi", "ssrf", "ssti", "redirect", "idor",
+               "cors", "web"},
+    "timeout": {"recon", "subfinder", "dirfinder", "paramfinder", "jsleak",
+                "xss", "sqli", "lfi", "ssrf", "ssti", "redirect", "idor",
+                "cors", "web", "portscan"},
+    "header": {"recon", "dirfinder", "paramfinder", "jsleak",
+               "xss", "sqli", "lfi", "ssrf", "ssti", "redirect", "idor",
+               "cors", "web"},
+}
+
+def load_config():
+    try:
+        with open(CONFIG_PATH) as f:
+            cfg = json.load(f)
+        return cfg if isinstance(cfg, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+def save_config(cfg):
+    os.makedirs(TBH_HOME, exist_ok=True)
+    with open(CONFIG_PATH, "w") as f:
+        json.dump(cfg, f, indent=2)
+
+def finalize_argv(name, args):
+    """append proxy/cookie/timeout/header from ~/.tbh/config.json
+    unless the user already passed that flag."""
+    cfg = load_config()
+    out = list(args)
+    if cfg.get("proxy") and name in SUPPORT["proxy"] and "--proxy" not in out:
+        out += ["--proxy", str(cfg["proxy"])]
+    if cfg.get("cookie") and name in SUPPORT["cookie"] and "--cookie" not in out:
+        out += ["--cookie", str(cfg["cookie"])]
+    if cfg.get("timeout") and name in SUPPORT["timeout"] and "--timeout" not in out:
+        out += ["--timeout", str(cfg["timeout"])]
+    headers = cfg.get("header") or []
+    if headers and name in SUPPORT["header"] and "-H" not in out:
+        for h in headers:
+            out += ["-H", str(h)]
+    return out
 
 # one file per tool in modules/. want to add one? drop the file, add a line here.
 REGISTRY = [
+    ("scan", "modules.scan", "run a bunch of tools at once, one report"),
     ("recon", "modules.recon", "headers, ssl, ports, subdomains in one pass"),
     ("subfinder", "modules.subfinder", "subdomain enum + cname takeover check"),
     ("dirfinder", "modules.dirfinder", "dir brute, has --depth for recursion"),
@@ -60,10 +111,14 @@ def print_help():
     print("  tbh list           tool versions")
     print("  tbh doctor         check python/requests")
     print("  tbh update         git pull")
+    print("  tbh ui            terminal UI (curses, for termux)")
+    print("  tbh config         show saved proxy/cookie/timeout/headers")
+    print("  tbh findings       what scan has saved so far")
     print(color("96", "\nexamples:"))
+    print("  tbh config set proxy http://127.0.0.1:8080   # then every tool uses it")
+    print("  tbh scan -u https://example.com --deep --html out.html")
     print("  tbh recon -u https://example.com --ssl -p")
     print("  tbh xss -u 'https://example.com/?q=test' --param all")
-    print("  tbh web -u https://example.com --json r.json --html r.html")
     print("  tbh <tool> --help for that tool's flags")
     print(color("91", "\nauthorized targets only."))
 
@@ -109,6 +164,78 @@ def cmd_update():
         print(color("92", "[✓] updated"))
     return r
 
+CONFIG_KEYS = ("proxy", "cookie", "timeout", "header")
+
+def cmd_config(argv):
+    cfg = load_config()
+    if not argv:
+        print(f"config: {CONFIG_PATH}")
+        if not cfg:
+            print("  (empty - set something with: tbh config set proxy http://127.0.0.1:8080)")
+        for k in CONFIG_KEYS:
+            v = cfg.get(k)
+            if v:
+                print(f"  {k} = {v}")
+        return 0
+    sub = argv[0]
+    if sub == "path":
+        print(CONFIG_PATH)
+        return 0
+    if sub == "set" and len(argv) >= 3:
+        key, val = argv[1], " ".join(argv[2:])
+        if key not in CONFIG_KEYS:
+            print(color("91", f"[!] unknown key '{key}' (one of: {', '.join(CONFIG_KEYS)})"), file=sys.stderr)
+            return 2
+        if key == "timeout":
+            try:
+                val = int(val)
+            except ValueError:
+                print(color("91", "[!] timeout must be a number"), file=sys.stderr)
+                return 2
+        if key == "header":
+            cfg.setdefault("header", [])
+            if val not in cfg["header"]:
+                cfg["header"].append(val)
+        else:
+            cfg[key] = val
+        save_config(cfg)
+        print(color("92", f"[+] {key} saved"))
+        return 0
+    if sub == "unset" and len(argv) >= 2:
+        key = argv[1]
+        if key == "header" and len(argv) >= 3:
+            h = " ".join(argv[2:])
+            cfg["header"] = [x for x in cfg.get("header", []) if x != h]
+        elif key in CONFIG_KEYS:
+            cfg.pop(key, None)
+        else:
+            print(color("91", f"[!] unknown key '{key}'"), file=sys.stderr)
+            return 2
+        save_config(cfg)
+        print(color("92", f"[+] {key} cleared"))
+        return 0
+    print("usage: tbh config [set <key> <value> | unset <key> | path]", file=sys.stderr)
+    return 2
+
+def cmd_findings():
+    if not os.path.isfile(FINDINGS_PATH):
+        print("no findings saved yet (run: tbh scan -u <url>)")
+        return 0
+    with open(FINDINGS_PATH) as f:
+        lines = f.readlines()
+    print(f"{len(lines)} finding(s) in {FINDINGS_PATH}")
+    for line in lines[-20:]:
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        sev = rec.get("severity", "info")
+        print(f"  {rec.get('when','?')}  [{sev}]  {rec.get('tool','?'):<10} "
+              f"{rec.get('url', rec.get('target', ''))}")
+    if len(lines) > 20:
+        print(f"  ... {len(lines) - 20} older, see the file")
+    return 0
+
 def input_line(prompt):
     try:
         return input(prompt)
@@ -116,10 +243,11 @@ def input_line(prompt):
         return None
 
 def run_tool(name, extra, target=None):
+    target_flag = "-t" if name in ("portscan", "subfinder") else "-u"
     cmdline = [sys.executable, os.path.abspath(__file__), name]
     if target:
-        cmdline += ["-u", target]
-    cmdline += extra
+        cmdline += [target_flag, target]
+    cmdline += finalize_argv(name, extra)
     print(color("96", f"[*] running: {' '.join(cmdline[2:])}"), flush=True)
     return subprocess.call(cmdline)
 
@@ -127,18 +255,37 @@ def interactive():
     """Numbered menu (Termux classic style)."""
     import shlex
     tools = REGISTRY
+    cfg = load_config()
+    last_target = ""
+    try:
+        with open(os.path.join(TBH_HOME, "last_target")) as f:
+            last_target = f.read().strip()
+    except OSError:
+        pass
+    session_target = last_target
     while True:
         print()
         print(color("91", "╔════════════════════════════════════╗"))
         print(color("91", "║") + color("0", "   TBH Toolkit v" + VERSION + "  -  Menu     ") + color("91", "║"))
         print(color("91", "║") + color("90", "   Tulungagung Black Hat             ") + color("91", "║"))
         print(color("91", "╚════════════════════════════════════╝"))
+        extras = []
+        if cfg.get("proxy"):
+            extras.append(f"proxy={cfg['proxy']}")
+        if cfg.get("cookie"):
+            extras.append("cookie=set")
+        if cfg.get("header"):
+            extras.append(f"headers={len(cfg['header'])}")
+        if extras:
+            print(color("90", "  config: " + ", ".join(extras) + "  (tbh config to change)"))
         width = max(len(n) for n, _, _ in tools)
         for i, (name, _, desc) in enumerate(tools, 1):
             print(f"  {color('96', f'[{i:>2}]')} {name:<{width}}  {desc}")
+        print(f"  {color('96', '[ W]')} ui        terminal UI (curses)")
+        print(f"  {color('96', '[ C]')} config    proxy/cookie/timeout/headers")
+        print(f"  {color('96', '[ F]')} findings  what scan has saved")
         print(f"  {color('96', '[ D]')} doctor    environment check")
         print(f"  {color('96', '[ U]')} update    git pull this toolkit")
-        print(f"  {color('96', '[ V]')} version   print version")
         print(f"  {color('96', '[ 0]')} exit")
         print(color("90", "─" * 40))
         raw = input_line(color("91", "tbh> "))
@@ -149,6 +296,18 @@ def interactive():
         if choice in ("0", "q", "exit", "quit"):
             print(color("90", "bye. authorized targets only."))
             return 0
+        if choice in ("w", "ui"):
+            subprocess.call([sys.executable, os.path.abspath(__file__), "ui"])
+            input_line(color("90", "[enter] to return to menu"))
+            continue
+        if choice in ("c", "config"):
+            cmd_config([])
+            input_line(color("90", "[enter]"))
+            continue
+        if choice in ("f", "findings"):
+            cmd_findings()
+            input_line(color("90", "[enter]"))
+            continue
         if choice in ("d", "doctor"):
             cmd_doctor()
             input_line(color("90", "[enter]"))
@@ -165,19 +324,40 @@ def interactive():
             print_help()
             input_line(color("90", "[enter]"))
             continue
-        if not choice.isdigit() or not (1 <= int(choice) <= len(tools)):
+        # accept a tool name too, not just its number
+        name = None
+        if choice.isdigit() and 1 <= int(choice) <= len(tools):
+            name = tools[int(choice) - 1][0]
+        elif choice in ALIASES:
+            name = ALIASES[choice]
+        else:
+            for cand, _mod, _d in tools:
+                if choice == cand:
+                    name = cand
+                    break
+        if name is None:
             print(color("91", f"[!] invalid choice '{choice}'"))
             continue
-        name, _, desc = tools[int(choice) - 1]
+        desc = next(d for n, _, d in tools if n == name)
         print(color("96", f"[*] {name} - {desc}"))
         target = None
         if name not in ("utils", "passstrength"):
-            t = input_line("    target URL (blank = tool's own menu/help): ")
+            hint = f" [{session_target}]" if session_target else ""
+            t = input_line(f"    target URL{hint} (enter = reuse, blank = tool menu/help): ")
             if t is None:
                 return 0
             t = t.strip()
             if t:
                 target = t
+                session_target = t
+                try:
+                    os.makedirs(TBH_HOME, exist_ok=True)
+                    with open(os.path.join(TBH_HOME, "last_target"), "w") as f:
+                        f.write(t)
+                except OSError:
+                    pass
+            elif session_target:
+                target = session_target
         extra_raw = input_line("    extra flags (optional, e.g. --param all --json r.json): ")
         if extra_raw is None:
             return 0
@@ -208,6 +388,18 @@ def main():
         return cmd_doctor()
     if arg == "update":
         return cmd_update()
+    if arg == "config":
+        return cmd_config(sys.argv[2:])
+    if arg == "findings":
+        return cmd_findings()
+    if arg == "ui":
+        try:
+            from modules import ui
+        except ImportError as e:
+            print(color("91", f"[!] ui needs a working terminal: {e}"), file=sys.stderr)
+            return 2
+        sys.argv = ["tbh ui"] + sys.argv[2:]
+        return ui.main()
     name = ALIASES.get(arg, arg)
     modules = cmd_map()
     if name not in modules:
@@ -219,7 +411,7 @@ def main():
         print(color("91", f"[!] cannot load {name}: {e}"), file=sys.stderr)
         print(color("91", "[!] pip install requests"), file=sys.stderr)
         return 2
-    sys.argv = [f"tbh {name}"] + sys.argv[2:]
+    sys.argv = [f"tbh {name}"] + finalize_argv(name, sys.argv[2:])
     return mod.main() or 0
 
 if __name__ == "__main__":

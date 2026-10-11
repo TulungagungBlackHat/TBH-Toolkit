@@ -9,6 +9,15 @@
 ### Fixed
 - Missing repo standards: SECURITY.md, CONTRIBUTING.md, CHANGELOG.md now present
 
+## [4.1.0] - 2026-10-11
+- `tbh ui` - curses interface (tools / scan / findings / config), termux friendly
+- `tbh scan` - run many tools at once against one target, combined json/html,
+  logs under ~/.tbh/logs/
+- `tbh config` - save proxy/cookie/timeout/headers in ~/.tbh/config.json,
+  every tool picks them up automatically (menu, cli, ui, scan)
+- `tbh findings` - what scan has saved so far
+- menu remembers last target, accepts tool names not just numbers
+
 ## [4.0.0] - 2026-10-11
 - merged all 17 tool repos into this one. code moved as-is, same flags,
   same exit codes. module versions unchanged (see `tbh list`)

@@ -18,6 +18,9 @@ jobs:
           python3 tbh version
           python3 tbh list
           python3 tbh doctor
+          python3 tbh ui --selftest
+          python3 tbh config
+          python3 tbh findings
       - name: Every tool --help
         run: |
           for c in recon subfinder dirfinder paramfinder jsleak xss sqli lfi ssrf ssti \

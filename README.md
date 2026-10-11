@@ -21,7 +21,10 @@ Needs python 3.8+ and `requests`. Works on Termux, linux, mac.
 ## Usage
 
 Run `tbh` with no args on a terminal, you get a numbered menu. Pick a tool,
-paste URL, add extra flags if you need them:
+paste URL, add extra flags if you need them.
+
+Want something prettier? `tbh ui` opens a curses interface (tools / scan /
+findings / config, j-k to move, enter to run, q to quit). Works fine in Termux.
 
 ```
 tbh> 1
@@ -43,6 +46,26 @@ python3 tbh utils hash -t secret123
 `python3 tbh <tool> --help` shows the flags. Most tools also take
 `--json`, `--proxy`, `--cookie`, `-H`, `--timeout`, `--no-color`.
 Exit codes: `0` nothing found, `1` found something, `2` error.
+
+## scan, config, findings
+
+the stuff that makes 17 tools feel like one toolkit:
+
+```bash
+python3 tbh scan -u https://example.com            # recon + cheap detectors
+python3 tbh scan -u https://example.com --deep     # + subs, dirs, js, ports, phish
+python3 tbh scan -u https://example.com --html report.html
+
+python3 tbh config set proxy http://127.0.0.1:8080  # saved in ~/.tbh/config.json
+python3 tbh config set cookie "session=abc"         # every tool picks these up
+python3 tbh config                                  # show what's saved
+
+python3 tbh findings                                # what scan has saved
+python3 tbh ui                                      # curses UI for all of it
+```
+
+config only adds flags you didn't already pass, and only to tools that
+actually support them (portscan won't choke on --proxy, etc).
 
 ## What's inside
 
