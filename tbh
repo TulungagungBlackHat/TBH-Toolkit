@@ -1,32 +1,36 @@
 #!/usr/bin/env python3
-"""TBH v4 - Tulungagung Black Hat unified security toolkit (authorized testing only).
+"""tbh - Tulungagung Black Hat toolkit.
 
-One command, all tools:  tbh <tool> [flags]
+everything used to be its own repo, merged it all here in v4.
+menu when you run it bare, subcommands when you know what you want.
+
+authorized targets only.
 """
 import importlib, os, re, subprocess, sys
 
 VERSION = "4.0"
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 
+# one file per tool in modules/. want to add one? drop the file, add a line here.
 REGISTRY = [
-    ("recon", "modules.recon", "Web recon: headers, SSL, ports, subdomains"),
-    ("subfinder", "modules.subfinder", "Subdomain enum + CNAME takeover detection"),
-    ("dirfinder", "modules.dirfinder", "Directory discovery with recursion (--depth)"),
-    ("paramfinder", "modules.paramfinder", "Hidden parameter discovery (active + passive)"),
-    ("jsleak", "modules.jsleak", "Secrets hunting in JavaScript files"),
-    ("xss", "modules.xss", "Reflected XSS detector (multi-payload, blind callback)"),
-    ("sqli", "modules.sqli", "Error-based SQL injection detector"),
-    ("lfi", "modules.lfi", "Path traversal / LFI detector"),
-    ("ssrf", "modules.ssrf", "SSRF detector (URL params, OOB collab)"),
-    ("ssti", "modules.ssti", "Template injection detector (dual-math)"),
-    ("redirect", "modules.redirect", "Open redirect detector"),
-    ("idor", "modules.idor", "IDOR probe (ID swap window)"),
-    ("cors", "modules.cors", "CORS misconfiguration detector"),
-    ("portscan", "modules.portscan", "Port scanner: top-100, banners, CVE hints"),
-    ("phish", "modules.phish", "Phishing URL detector (12 heuristics)"),
-    ("passstrength", "modules.passstrength", "Password strength checker + generator"),
-    ("utils", "modules.utils", "Encoder utilities: b64, url, hash, jwt inspect"),
-    ("web", "modules.cli", "34-module web check suite (was TBH-CLI)"),
+    ("recon", "modules.recon", "headers, ssl, ports, subdomains in one pass"),
+    ("subfinder", "modules.subfinder", "subdomain enum + cname takeover check"),
+    ("dirfinder", "modules.dirfinder", "dir brute, has --depth for recursion"),
+    ("paramfinder", "modules.paramfinder", "hidden params (active + from js)"),
+    ("jsleak", "modules.jsleak", "secrets in js files"),
+    ("xss", "modules.xss", "reflected xss, blind mode w/ callback"),
+    ("sqli", "modules.sqli", "error-based sqli"),
+    ("lfi", "modules.lfi", "path traversal / lfi"),
+    ("ssrf", "modules.ssrf", "ssrf on url params, --collab for oob"),
+    ("ssti", "modules.ssti", "template injection, dual-math trick"),
+    ("redirect", "modules.redirect", "open redirect"),
+    ("idor", "modules.idor", "idor probe (id swap window)"),
+    ("cors", "modules.cors", "cors misconfig"),
+    ("portscan", "modules.portscan", "top-100 ports + banners"),
+    ("phish", "modules.phish", "phishing url heuristics"),
+    ("passstrength", "modules.passstrength", "password score + generator"),
+    ("utils", "modules.utils", "b64 / url / hash / jwt / qr stuff"),
+    ("web", "modules.cli", "34-check web suite + html report (old TBH-CLI)"),
 ]
 ALIASES = {"cli": "web", "scanner": "portscan", "password": "passstrength"}
 META = ("list", "doctor", "update", "version", "help")
@@ -40,9 +44,9 @@ def cmd_map():
     return {name: mod for name, mod, _ in REGISTRY}
 
 def print_help():
-    print(color("91", "TBH") + f" v{VERSION} - Tulungagung Black Hat unified toolkit")
-    print("Usage: tbh <tool> [flags]\n")
-    print(color("96", "Tools:"))
+    print(color("91", "TBH") + f" v{VERSION} - tulungagung black hat toolkit")
+    print("usage: tbh            # menu\n      tbh <tool> [flags]\n")
+    print(color("96", "tools:"))
     width = max(len(n) for n, _, _ in REGISTRY)
     for name, mod, desc in REGISTRY:
         try:
@@ -52,18 +56,16 @@ def print_help():
         except OSError:
             v = ""
         print(f"  {name:<{width}}  {desc}{color('90', v)}")
-    print(color("96", "\nMeta:"))
-    print("  list               same as tools with versions")
-    print("  doctor             check python/requests environment")
-    print("  update             git pull this toolkit")
-    print("  version            print toolkit version")
-    print(color("96", "\nExamples:"))
-    print("  tbh recon -u https://example.com --ssl -p -s")
+    print(color("96", "\nother:"))
+    print("  tbh list           tool versions")
+    print("  tbh doctor         check python/requests")
+    print("  tbh update         git pull")
+    print(color("96", "\nexamples:"))
+    print("  tbh recon -u https://example.com --ssl -p")
     print("  tbh xss -u 'https://example.com/?q=test' --param all")
     print("  tbh web -u https://example.com --json r.json --html r.html")
-    print("  tbh dirfinder -u https://example.com --depth 2")
-    print("  tbh --help | tbh <tool> --help for per-tool flags")
-    print(color("91", "\n[!] Authorized targets only."))
+    print("  tbh <tool> --help for that tool's flags")
+    print(color("91", "\nauthorized targets only."))
 
 def cmd_list():
     print(f"{'TOOL':14} {'VERSION':8} DESCRIPTION")

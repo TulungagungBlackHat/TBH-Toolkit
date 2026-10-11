@@ -7,10 +7,8 @@ RED='\033[91m'; GREEN='\033[92m'; CYAN='\033[96m'; NC='\033[0m'
 REPO_URL="https://github.com/TulungagungBlackHat/TBH-Toolkit"
 DEST="${1:-TBH-Toolkit}"
 
-echo -e "${RED}╔════════════════════════════════════╗"
-echo -e "║  TBH Toolkit Installer (unified)   ║"
-echo -e "║  Tulungagung Black Hat             ║"
-echo -e "╚════════════════════════════════════╝${NC}"
+echo -e "${RED}TBH toolkit installer${NC}"
+echo -e "${CYAN}(authorized testing only, obviously)${NC}"
 
 if [ -d "$DEST" ]; then
   echo -e "${CYAN}[=] $DEST exists, skipping clone${NC}"
@@ -31,9 +29,8 @@ else
 fi
 
 echo ""
-echo -e "${GREEN}[✓] Done. Start here:${NC}"
-echo "  python3 $DEST/tbh --help"
+echo -e "${GREEN}[+] done. try:${NC}"
+echo "  python3 $DEST/tbh          # menu"
 echo "  python3 $DEST/tbh list"
-echo "  python3 $DEST/tbh recon -u https://example.com --ssl -p -s"
 echo ""
-echo "Authorized targets only. See SECURITY.md."
+echo "Authorized targets only."

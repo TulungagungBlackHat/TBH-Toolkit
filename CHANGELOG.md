@@ -10,16 +10,9 @@
 - Missing repo standards: SECURITY.md, CONTRIBUTING.md, CHANGELOG.md now present
 
 ## [4.0.0] - 2026-10-11
-### Added
-- Interactive numbered **menu** when run without arguments (target + extra-flags prompts).
-- Unified dispatcher `tbh <tool>` with 18 subcommands, aliases (`cli`→`web`, `scanner`→`portscan`).
-- Meta commands: `tbh list`, `tbh doctor`, `tbh update`.
-- All 17 former per-tool repos merged into `modules/` (same flags, same exit codes).
-
-### Changed
-- `install.sh` now clones this repo only (was: 20 separate clones).
-- README rewritten for the monorepo menu-first workflow.
-- CI validates the dispatcher + every subcommand `--help`.
-
-### Deprecated
-- Per-tool repositories are archived with banners pointing here.
+- merged all 17 tool repos into this one. code moved as-is, same flags,
+  same exit codes. module versions unchanged (see `tbh list`)
+- bare `tbh` opens a numbered menu now (pick tool, paste url, extra flags)
+- `tbh list` / `tbh doctor` / `tbh update` while i was at it
+- install.sh only clones this repo now instead of 20
+- old per-tool repos archived with a banner pointing here
