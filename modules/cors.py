@@ -184,6 +184,11 @@ def main():
         if order.index(f["severity"]) > order.index(worst):
             worst = f["severity"]
 
+    errors = sum(1 for f in report["findings"] if "error" in f)
+    if errors and errors == len(report["findings"]):
+        print(color("91", "[!] all probes failed - cannot reach target (network/proxy)", use_color))
+        sys.exit(2)
+
     if args.json:
         report["summary"] = {"worst_severity": worst}
         try:
