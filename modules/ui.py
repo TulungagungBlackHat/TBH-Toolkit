@@ -15,7 +15,7 @@ import subprocess
 import sys
 import threading
 
-VERSION = "1.0"
+VERSION = "1.1"
 TBH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "tbh"))
 HOME = os.path.expanduser("~/.tbh")
 JOBS_DIR = os.path.join(HOME, "jobs")
@@ -54,6 +54,8 @@ class Job:
                                         text=True, bufsize=1)
                 for line in proc.stdout:
                     self.lines.append(line.rstrip("\n"))
+                    if len(self.lines) > 2000:
+                        del self.lines[:500]
                     logf.write(line)
                 self.rc = proc.wait()
         except OSError as e:
@@ -84,12 +86,17 @@ class App:
         self.scan_deep = False
         self.findings_cache = None
         self.colors = {}
+        self.help = False
+        self._announced = None
 
     # ---------- drawing ----------
     def init_colors(self, scr):
         import curses
-        scr.start_color()
-        scr.use_default_colors()
+        curses.start_color()
+        try:
+            curses.use_default_colors()
+        except curses.error:
+            pass
         curses.init_pair(1, curses.COLOR_RED, -1)
         curses.init_pair(2, curses.COLOR_CYAN, -1)
         curses.init_pair(3, curses.COLOR_GREEN, -1)
@@ -167,7 +174,39 @@ class App:
             scr.addstr(h - 1, 0, msg[:w - 1], curses.A_DIM)
         except curses.error:
             pass
+        if self.help:
+            self.draw_help(scr, h, w)
         scr.refresh()
+
+    def draw_help(self, scr, h, w):
+        import curses
+        lines = [
+            " keys",
+            "  j/k or arrows  move",
+            "  enter          run / edit",
+            "  tab            next section",
+            "  1-4            jump to section",
+            "  d              scan: toggle deep / config: clear",
+            "  [ ]            output pane scroll (pgup/pgdn)",
+            "  ?              this help",
+            "  q              quit",
+            "",
+            " press ? to close",
+        ]
+        box_h = len(lines) + 2
+        box_w = max(len(x) for x in lines) + 4
+        y0 = max(1, (h - box_h) // 2)
+        x0 = max(1, (w - box_w) // 2)
+        for i in range(box_h):
+            try:
+                scr.addstr(y0 + i, x0, " " * box_w, self.colors["sel"])
+            except curses.error:
+                pass
+        for i, ln in enumerate(lines):
+            try:
+                scr.addstr(y0 + 1 + i, x0 + 2, ln[: box_w - 4], self.colors["sel"])
+            except curses.error:
+                pass
 
     def draw_tools(self, scr, top, bot, w):
         import curses
@@ -207,8 +246,10 @@ class App:
         if not recs:
             scr.addstr(top + 2, 2, "run a scan first (scan tab)", curses.A_DIM)
             return
-        rows = recs[::-1][: bot - top - 2]
-        for i, r in enumerate(rows):
+        rows = recs[::-1]
+        self.scroll = max(0, min(self.scroll, max(0, len(rows) - 1)))
+        view = rows[self.scroll: self.scroll + (bot - top - 2)]
+        for i, r in enumerate(view):
             y = top + 2 + i
             if y >= bot:
                 break
@@ -275,7 +316,14 @@ class App:
         elif ch == curses.KEY_NPAGE:
             self.out_scroll = max(0, self.out_scroll - 5)
             return
-        if key in (ord("q"),) and self.sec != -1:
+        if key == ord("?"):
+            self.help = not self.help
+            return
+        if self.help:
+            if key in (ord("?"), 27):
+                self.help = False
+            return
+        if key == ord("q"):
             raise KeyboardInterrupt
         if key == 9:  # tab
             self.sec = (self.sec + 1) % len(SECTIONS)
@@ -425,6 +473,9 @@ def run_ui():
         app.init_colors(scr)
         scr.timeout(120)
         while True:
+            if app.job and app.job.rc is not None and app._announced is not app.job:
+                app._announced = app.job
+                app.status = f"{app.job.tool} finished (exit {app.job.rc})"
             app.draw(scr)
             ch = scr.getch()
             if ch == -1:

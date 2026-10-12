@@ -9,6 +9,12 @@
 ### Fixed
 - Missing repo standards: SECURITY.md, CONTRIBUTING.md, CHANGELOG.md now present
 
+## [4.1.1] - 2026-10-12
+- ui: fix crash on terminals without start_color window attr (real bug found by pty test)
+- ui: findings list actually scrolls (j/k), status bar announces when a job finishes
+- ui: `?` opens a key legend, job output capped at 2000 lines
+- cors: all-probes-failed now exits 2 instead of "clean" (network/proxy errors)
+
 ## [4.1.0] - 2026-10-11
 - `tbh ui` - curses interface (tools / scan / findings / config), termux friendly
 - `tbh scan` - run many tools at once against one target, combined json/html,
